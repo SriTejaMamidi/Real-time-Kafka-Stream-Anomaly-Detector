@@ -1,0 +1,73 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Spark
+*.jar
+metastore_db/
+derby.log
+
+# Kafka
+kafka-logs/
+.kafka-logs/
+
+# Data & Models
+data/
+*.csv
+*.pkl
+*.joblib
+checkpoint_*
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints
+*.ipynb
+
+# Notebooks (optional)
+.jupyter/
