@@ -1,0 +1,18 @@
+# Kafka Configuration
+brokers:
+  - "localhost:9092"
+
+topic: "metrics"
+partitions: 3
+replication_factor: 1
+
+consumer:
+  group_id: "anomaly-detection"
+  auto_offset_reset: "latest"
+  enable_auto_commit: true
+  auto_commit_interval_ms: 5000
+
+producer:
+  batch_size: 100
+  linger_ms: 10
+  compression_type: "snappy"
