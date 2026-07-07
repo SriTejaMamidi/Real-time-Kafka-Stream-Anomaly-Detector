@@ -1,0 +1,31 @@
+# Anomaly Detection Model Configuration
+model:
+  name: "isolation_forest"
+  version: "1.0"
+
+isolation_forest:
+  contamination: 0.05  # 5% expected anomalies
+  n_estimators: 100
+  max_samples: auto
+  random_state: 42
+
+detection:
+  anomaly_threshold: 0.8  # Confidence threshold
+  min_samples: 100  # Minimum samples for window
+
+features:
+  - cpu_usage
+  - memory_usage
+  - network_io
+  - disk_io
+
+normalization:
+  method: "standard_scaler"  # StandardScaler or MinMaxScaler
+  fit_on_training: true
+
+monitoring:
+  track_metrics: true
+  alert_threshold: 0.9
+  notification_method: "sns"
+  email_recipients:
+    - "alerts@example.com"
