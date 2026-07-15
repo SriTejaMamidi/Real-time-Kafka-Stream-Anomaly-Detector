@@ -1,115 +1,137 @@
 """
-Distributed data loading utilities.
+Isolation Forest based anomaly detector for streaming data.
 """
 
-import torch
-from torch.utils.data import DataLoader, DistributedSampler, Dataset
-import torchvision.transforms as transforms
-from torchvision.datasets import CIFAR10
 import logging
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+import joblib
 
 logger = logging.getLogger(__name__)
 
 
-class DistributedDataLoader:
-    """Distributed data loading helper."""
+class AnomalyDetector:
+    """Anomaly detector using Isolation Forest."""
 
-    @staticmethod
-    def get_train_loader(
-            batch_size: int,
-            num_workers: int,
-            rank: int,
-            world_size: int,
-            pin_memory: bool = True,
-    ) -> DataLoader:
-        """Get distributed training data loader.
+    def __init__(
+            self,
+            contamination: float = 0.05,
+            threshold: float = 0.8,
+            n_estimators: int = 100,
+            random_state: int = 42
+    ):
+        """Initialize anomaly detector.
 
         Args:
-            batch_size: Batch size per GPU
-            num_workers: Number of workers
-            rank: Current rank
-            world_size: Total number of ranks
-            pin_memory: Pin memory for faster transfer
+            contamination: Expected proportion of anomalies
+            threshold: Decision threshold for anomaly score
+            n_estimators: Number of isolation trees
+            random_state: Random seed
+        """
+        self.contamination = contamination
+        self.threshold = threshold
+        self.n_estimators = n_estimators
+        self.random_state = random_state
+
+        self.model = IsolationForest(
+            contamination=contamination,
+            n_estimators=n_estimators,
+            random_state=random_state,
+            n_jobs=-1
+        )
+
+        self.scaler = StandardScaler()
+        self.is_trained = False
+
+        logger.info("AnomalyDetector initialized")
+
+    def train(self, X_train: np.ndarray):
+        """Train detector on historical data.
+
+        Args:
+            X_train: Training data (n_samples, n_features)
+        """
+        logger.info(f"Training on {X_train.shape[0]} samples")
+
+        # Fit scaler
+        X_scaled = self.scaler.fit_transform(X_train)
+
+        # Fit model
+        self.model.fit(X_scaled)
+
+        self.is_trained = True
+        logger.info("Training completed")
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """Predict anomaly scores.
+
+        Args:
+            X: Input data (n_samples, n_features)
 
         Returns:
-            DataLoader
+            Anomaly scores (0-1, higher = more anomalous)
         """
-        transform = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                (0.4914, 0.4822, 0.4465),
-                (0.2023, 0.1994, 0.2010)
-            ),
-        ])
+        if not self.is_trained:
+            raise ValueError("Model not trained. Call train() first.")
 
-        dataset = CIFAR10(
-            root="data/",
-            train=True,
-            download=True,
-            transform=transform
+        X_scaled = self.scaler.transform(X)
+        scores = -self.model.score_samples(X_scaled)
+
+        # Normalize to [0, 1]
+        scores = (scores - scores.min()) / (scores.max() - scores.min() + 1e-8)
+
+        return scores
+
+    def detect(self, X: np.ndarray) -> np.ndarray:
+        """Detect anomalies (binary).
+
+        Args:
+            X: Input data
+
+        Returns:
+            Binary anomaly flags (1 = anomaly, -1 = normal)
+        """
+        if not self.is_trained:
+            raise ValueError("Model not trained")
+
+        X_scaled = self.scaler.transform(X)
+        return self.model.predict(X_scaled)
+
+    def detect_with_scores(self, X: np.ndarray):
+        """Get both predictions and scores.
+
+        Args:
+            X: Input data
+
+        Returns:
+            Tuple of (predictions, scores)
+        """
+        predictions = self.detect(X)
+        scores = self.predict(X)
+
+        return predictions, scores
+
+    def save(self, path: str):
+        """Save trained model.
+
+        Args:
+            path: Path to save model
+        """
+        joblib.dump(
+            {"model": self.model, "scaler": self.scaler},
+            path
         )
+        logger.info(f"Model saved to {path}")
 
-        sampler = DistributedSampler(
-            dataset,
-            num_replicas=world_size,
-            rank=rank,
-            shuffle=True,
-            drop_last=True,
-        )
+    def load(self, path: str):
+        """Load trained model.
 
-        loader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            sampler=sampler,
-            num_workers=num_workers,
-            pin_memory=pin_memory,
-        )
-
-        logger.info(
-            f"Rank {rank}: Train loader created "
-            f"(batch_size={batch_size}, num_workers={num_workers})"
-        )
-
-        return loader
-
-    @staticmethod
-    def get_val_loader(
-            batch_size: int,
-            num_workers: int,
-            rank: int,
-            world_size: int,
-    ) -> DataLoader:
-        """Get distributed validation data loader."""
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(
-                (0.4914, 0.4822, 0.4465),
-                (0.2023, 0.1994, 0.2010)
-            ),
-        ])
-
-        dataset = CIFAR10(
-            root="data/",
-            train=False,
-            download=True,
-            transform=transform
-        )
-
-        sampler = DistributedSampler(
-            dataset,
-            num_replicas=world_size,
-            rank=rank,
-            shuffle=False,
-            drop_last=False,
-        )
-
-        loader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            sampler=sampler,
-            num_workers=num_workers,
-        )
-
-        return loader
+        Args:
+            path: Path to load model from
+        """
+        data = joblib.load(path)
+        self.model = data["model"]
+        self.scaler = data["scaler"]
+        self.is_trained = True
+        logger.info(f"Model loaded from {path}")
