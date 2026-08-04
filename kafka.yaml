@@ -1,4 +1,4 @@
-# Kafka Configuration
+#Kafka Configuration
 brokers:
   - "localhost:9092"
 
