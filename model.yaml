@@ -4,14 +4,14 @@ model:
   version: "1.0"
 
 isolation_forest:
-  contamination: 0.05  # 5% expected anomalies
+  contamination: 0.05  
   n_estimators: 100
   max_samples: auto
   random_state: 42
 
 detection:
-  anomaly_threshold: 0.8  # Confidence threshold
-  min_samples: 100  # Minimum samples for window
+  anomaly_threshold: 0.8  
+  min_samples: 100  
 
 features:
   - cpu_usage
@@ -20,7 +20,7 @@ features:
   - disk_io
 
 normalization:
-  method: "standard_scaler"  # StandardScaler or MinMaxScaler
+  method: "standard_scaler" 
   fit_on_training: true
 
 monitoring:
